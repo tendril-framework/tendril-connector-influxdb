@@ -31,6 +31,7 @@ def read(fname):
 core_dependencies = [
     'tendril-config',
     'tendril-async-utils-core',
+    'influxdb-client[ciso]',
 ]
 
 install_requires = core_dependencies + ['wheel']

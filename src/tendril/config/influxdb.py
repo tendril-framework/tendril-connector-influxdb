@@ -39,12 +39,31 @@ config_elements_influxdb = [
         "InfluxDB Server Port"
     ),
     ConfigOption(
-        'INFLUXDB_SERVER_ORG',
+        'INFLUXDB_ORG',
         "'tendril'",
         "InfluxDB Organization to use. All InfluxDB Connections from tendril "
-        "will use this organization host unless locally overridden in some "
-        "as yet unspecified way."
+        "will use this organization unless locally overridden in some as yet "
+        "unspecified way."
     ),
+    ConfigOption(
+        'INFLUXDB_ORG_TOKEN',
+        "",
+        "API Token to use when connecting to InfluxDB. This might usually be "
+        "an empowered user with admin-like access to do things like create "
+        "buckets, etc. At present, the code does not use this account."
+    ),
+    ConfigOption(
+        'INFLUXDB_DEFAULT_BUCKET',
+        "",
+        "InfluxDB Bucket to use. All InfluxDB Connections from tendril "
+        "will use this bucket unless locally overridden in some as yet "
+        "unspecified way."
+    ),
+    ConfigOption(
+        'INFLUXDB_DEFAULT_BUCKET_TOKEN',
+        "",
+        "InfluxDB Token to use with the Default Bucket to use."
+    )
 ]
 
 
