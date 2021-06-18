@@ -63,6 +63,11 @@ config_elements_influxdb = [
         'INFLUXDB_DEFAULT_BUCKET_TOKEN',
         "",
         "InfluxDB Token to use with the Default Bucket to use."
+    ),
+    ConfigOption(
+        'INFLUXDB_BUCKETS',
+        "[]",
+        "InfluxDB buckets to be made available to the application."
     )
 ]
 
