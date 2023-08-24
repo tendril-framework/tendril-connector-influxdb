@@ -1,0 +1,19 @@
+
+
+from enum import Enum
+
+
+class TimeSeriesFundamentalType(Enum):
+    NUMERIC = "NUMERIC"
+    BOOLEAN = "BOOLEAN"
+    TEXT = "TEXT"
+    TIMESTAMP = "TIMESTAMP"
+
+
+class TimeSeriesExporter(Enum):
+    RAW = "RAW"
+    CHANGES_ONLY = "CHANGES_ONLY"
+    DISCONTINUITIES_ONLY = "DISCONTINUITIES_ONLY"
+    WINDOWED_MEAN = "WINDOWED_MEAN"
+    WINDOWED_SUMMATION = "WINDOWED_SUMMATION"
+    WINDOWED_BAND = "WINDOWED_BAND"

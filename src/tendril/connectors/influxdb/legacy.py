@@ -13,6 +13,10 @@ from tendril.config import INFLUXDB_DEFAULT_BUCKET
 from tendril.config import INFLUXDB_DEFAULT_BUCKET_TOKEN
 
 
+# This is simply copied over from the earlier implementation and is untested.
+# In theory, this should essentially be a fire and forget async writer. In
+# practice, not sure. This is probably Influx 1.x code.
+
 class InfluxDBAsyncBurstWriter(object):
     def __init__(self, bucket=INFLUXDB_DEFAULT_BUCKET,
                  token=INFLUXDB_DEFAULT_BUCKET_TOKEN):
@@ -50,3 +54,6 @@ class InfluxDBAsyncBurstWriter(object):
         _async_result = self._write_api.write(bucket=self._bucket,
                                               record=[self._points])
         self._client.close()
+
+
+TSDBAsyncBurstWriter = InfluxDBAsyncBurstWriter
