@@ -183,10 +183,8 @@ class ChangesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
             df = df.filter(polars.col("keep"))
             df = df.drop(["prev_value", "keep", "result", "table"])
             return [row for row in df.rows()]
-        except ColumnNotFoundError:
-            logger.warn(f"Expected column {colname} not found in query response. Query :")
-            logger.info(self.build())
-            return None
+        except ColumnNotFoundError as e:
+            logger.warn(f"Expected column not found in query response.\n Error: {e} \n Query:\n {self.build()}")
 
 
 class DiscontinuitiesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
@@ -219,9 +217,8 @@ class DiscontinuitiesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
             df = df.filter(polars.col("keep"))
             df = df.drop(["keep", "difference", "next_difference", "result", "table"])
             return [row for row in df.rows()]
-        except ColumnNotFoundError:
-            logger.warn("Expected column not found in query response. Query:")
-            logger.info(self.build())
+        except ColumnNotFoundError as e:
+            logger.warn(f"Expected column not found in query response.\n Error: {e} \n Query:\n {self.build()}")
 
 
 class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
