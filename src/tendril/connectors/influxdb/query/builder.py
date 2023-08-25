@@ -17,13 +17,6 @@ def _get_bucket(domain):
 _buckets = {x: _get_bucket(x) for x in INFLUXDB_BUCKETS}
 
 
-def subtract_dicts(a, b):
-    # b is guaranteed to have 100% overlap with a
-    for key in b.keys():
-        a.pop(key)
-    return a
-
-
 class InfluxDBFluxQueryBuilder(object):
     _extra_columns = []
     _strategy = None

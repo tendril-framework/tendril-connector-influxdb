@@ -1,7 +1,5 @@
 
 
-import asyncio
-import importlib
 from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 from .query.planner import InfluxDBQueryPlanner
 
@@ -13,10 +11,6 @@ from tendril.config import INFLUXDB_BUCKETS
 
 from tendril.utils import log
 logger = log.get_logger(__name__, log.DEFAULT)
-
-import warnings
-# from influxdb_client.client.warnings import MissingPivotFunction
-# warnings.simplefilter("ignore", MissingPivotFunction)
 
 
 # TODO There is no apparent connection pooling going on here.

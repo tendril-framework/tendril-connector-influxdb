@@ -1,6 +1,5 @@
 
 
-import warnings
 from tendril.core.tsdb.constants import TimeSeriesExporter
 from tendril.core.tsdb.query.models import TimeSeriesQueryItemTModel
 
@@ -17,6 +16,13 @@ def intersect_dicts(a, b):
         if a[key] == b[key]:
             rv[key] = a[key]
     return rv
+
+
+def subtract_dicts(a, b):
+    # b is guaranteed to have 100% overlap with a
+    for key in b.keys():
+        a.pop(key)
+    return a
 
 
 class InfluxDBQueryPlanner(object):
