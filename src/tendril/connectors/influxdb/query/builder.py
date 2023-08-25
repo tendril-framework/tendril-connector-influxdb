@@ -3,12 +3,15 @@
 import polars
 from functools import partial
 from typing import List
+from polars.exceptions import ColumnNotFoundError
 
 from tendril import config
 from tendril.config import INFLUXDB_BUCKETS
 from tendril.core.tsdb.query.models import TimeSeriesQueryItemTModel
 from tendril.core.tsdb.query.models import QueryTimeSpanTModel
 from tendril.core.tsdb.constants import TimeSeriesExporter
+from tendril.utils import log
+logger = log.get_logger(__name__, log.DEFAULT)
 
 
 def _get_bucket(domain):
@@ -171,14 +174,19 @@ class ChangesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
     def repacker(self, response):
         df = polars.from_pandas(response)
         colname = self._params.measurement
-        df = df.with_columns(df[colname].shift(1).alias("prev_value"))
-        df = df.with_columns(
-            polars.when(polars.col(colname) != polars.col("prev_value"))
-            .then(True)
-            .otherwise(polars.col("_time") == df["_time"].max()).alias("keep"))
-        df = df.filter(polars.col("keep"))
-        df = df.drop(["prev_value", "keep", "result", "table"])
-        return [row for row in df.rows()]
+        try:
+            df = df.with_columns(df[colname].shift(1).alias("prev_value"))
+            df = df.with_columns(
+                polars.when(polars.col(colname) != polars.col("prev_value"))
+                .then(True)
+                .otherwise(polars.col("_time") == df["_time"].max()).alias("keep"))
+            df = df.filter(polars.col("keep"))
+            df = df.drop(["prev_value", "keep", "result", "table"])
+            return [row for row in df.rows()]
+        except ColumnNotFoundError:
+            logger.warn(f"Expected column {colname} not found in query response. Query :")
+            logger.info(self.build())
+            return None
 
 
 class DiscontinuitiesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
@@ -196,20 +204,24 @@ class DiscontinuitiesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
     
     def repacker(self, response):
         df = polars.from_pandas(response)
-        df = df.with_columns(polars.col("difference").shift(-1).alias("next_difference"))
-        df = df.with_columns(
-            polars.when((polars.col("difference") < self.step_size[0]) |
-                       (polars.col("difference") > self.step_size[1]) |
-                       (polars.col("next_difference") < self.step_size[0]) |
-                       (polars.col("next_difference") > self.step_size[1]))
-                  .then(True)
-                  .otherwise((polars.col("_time") == df["_time"].max()) |
-                             (polars.col("_time") == df["_time"].min()))
-                  .alias("keep")
-        )
-        df = df.filter(polars.col("keep"))
-        df = df.drop(["keep", "difference", "next_difference", "result", "table"])
-        return [row for row in df.rows()]
+        try:
+            df = df.with_columns(polars.col("difference").shift(-1).alias("next_difference"))
+            df = df.with_columns(
+                polars.when((polars.col("difference") < self.step_size[0]) |
+                           (polars.col("difference") > self.step_size[1]) |
+                           (polars.col("next_difference") < self.step_size[0]) |
+                           (polars.col("next_difference") > self.step_size[1]))
+                      .then(True)
+                      .otherwise((polars.col("_time") == df["_time"].max()) |
+                                 (polars.col("_time") == df["_time"].min()))
+                      .alias("keep")
+            )
+            df = df.filter(polars.col("keep"))
+            df = df.drop(["keep", "difference", "next_difference", "result", "table"])
+            return [row for row in df.rows()]
+        except ColumnNotFoundError:
+            logger.warn("Expected column not found in query response. Query:")
+            logger.info(self.build())
 
 
 class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
