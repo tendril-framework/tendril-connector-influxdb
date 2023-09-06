@@ -50,7 +50,8 @@ config_elements_influxdb = [
         "",
         "API Token to use when connecting to InfluxDB. This might usually be "
         "an empowered user with admin-like access to do things like create "
-        "buckets, etc. At present, the code does not use this account."
+        "buckets, etc. At present, the code does not use this account.",
+        masked=True,
     ),
     ConfigOption(
         'INFLUXDB_DEFAULT_BUCKET',
@@ -62,7 +63,8 @@ config_elements_influxdb = [
     ConfigOption(
         'INFLUXDB_DEFAULT_BUCKET_TOKEN',
         "",
-        "InfluxDB Token to use with the Default Bucket to use."
+        "InfluxDB Token to use with the Default Bucket to use.",
+        masked=True
     ),
     ConfigOption(
         'INFLUXDB_BUCKETS',

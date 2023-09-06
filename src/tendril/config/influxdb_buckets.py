@@ -17,7 +17,8 @@ def _bucket_config_template(bucket_name):
         ConfigOption(
             'INFLUXDB_{}_TOKEN'.format(bucket_name.upper()),
             "''",
-            "InfluxDB Token to with with the {} data bucket".format(bucket_name)
+            "InfluxDB Token to with with the {} data bucket".format(bucket_name),
+            masked=True
         ),
     ]
 
