@@ -337,7 +337,7 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         if len(self._channel_tables) > 1:
             rv = f'union(tables: [{", ".join(self._channel_tables)}])\n'
         else:
-            rv = self._channel_tables[0]
+            rv = f'{self._channel_tables[0]}\n'
         return rv
 
     def _reshape_output(self):
