@@ -10,7 +10,11 @@ from tendril.config import INFLUXDB_ORG
 from tendril.config import INFLUXDB_BUCKETS
 
 from tendril.utils import log
-logger = log.get_logger(__name__, log.DEFAULT)
+logger = log.get_logger(__name__, log.DEBUG)
+
+import warnings
+from influxdb_client.client.warnings import MissingPivotFunction
+warnings.simplefilter("ignore", MissingPivotFunction)
 
 
 # TODO There is no apparent connection pooling going on here.
@@ -29,7 +33,7 @@ _connection_parameters = {x: _get_connection_parameters(x)
                           for x in INFLUXDB_BUCKETS}
 
 
-async def influxdb_execute_query(client, query, want_data_frame=False):
+async def _influxdb_execute_query(client, query, want_data_frame=False):
     # TODO Investigate Query Profiler.
     #  https://github.com/influxdata/influxdb-client-python#profile-query
     query_api = client.query_api()
@@ -41,14 +45,29 @@ async def influxdb_execute_query(client, query, want_data_frame=False):
     return result
 
 
+async def influxdb_execute_query(builder):
+    kwargs = _connection_parameters[builder.domain]
+    async with InfluxDBClientAsync(**kwargs) as client:
+        rv = await _influxdb_execute_query(
+            client, builder.build(),
+            want_data_frame=builder.want_data_frame
+        )
+        rv = builder.repacker(rv)
+    return {
+        'strategy': builder.strategy,
+        'columns': builder.response_columns,
+        'data': rv
+    }
+
+
 async def influxdb_execute_query_plan(plan: InfluxDBQueryPlanner):
     rv = {}
     for domain in plan.query_domains():
         rv[domain] = {}
         kwargs = _connection_parameters[domain]
-        async with (InfluxDBClientAsync(**kwargs) as client):
+        async with InfluxDBClientAsync(**kwargs) as client:
             for name, builder in plan.generate_queries(domain):
-                response = await influxdb_execute_query(
+                response = await _influxdb_execute_query(
                     client, query=builder.build(),
                     want_data_frame=builder.want_data_frame)
                 rv[domain][name] = {'strategy': builder.strategy,

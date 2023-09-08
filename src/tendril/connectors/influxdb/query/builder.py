@@ -20,35 +20,14 @@ def _get_bucket(domain):
 _buckets = {x: _get_bucket(x) for x in INFLUXDB_BUCKETS}
 
 
-class InfluxDBFluxQueryBuilder(object):
-    _extra_columns = []
+class InfluxDBFluxQueryBuilderBase(object):
     _strategy = None
+    want_data_frame = False
 
-    def __init__(self, params: TimeSeriesQueryItemTModel,
-                 include_open=True, include_close=True,
-                 lone_value=False):
-        if not lone_value:
-            raise NotImplementedError(
-                "These query builders presently assume each record holds a single value, "
-                "and is present in the field 'value'. This is how tendril interest monitors "
-                "currently store data in influxdb. If the data you are querying follows this "
-                "pattern, then set lone_value=True when instantiating this builder. However, "
-                "this is not the regular way data is stored in influxdb. If the data you are "
-                "querying does not do this, then the builders will need to be written to allow "
-                "this.")
-        self._params = params
-        self.bucket = params.domain
-        self.time_span = params.time_span
+    def __init__(self):
+        self._time_span: QueryTimeSpanTModel = None
+        self._bucket = None
         self._simple_filters = []
-        self._subqueries = []
-        self.simple_filter('_measurement', params.measurement)
-
-        if include_open:
-            self._subqueries = [
-                ('openValue', (partial(self._render_selectors, range='before'),
-                               ' |> last()\n')),
-                ('rangeValues', (self._render_selectors,))
-            ]
 
     @property
     def bucket(self):
@@ -60,6 +39,10 @@ class InfluxDBFluxQueryBuilder(object):
 
     def _render_bucket(self):
         return f'from(bucket: "{self._bucket}")\n'
+
+    @property
+    def domain(self):
+        return self._bucket
 
     @property
     def time_span(self) -> QueryTimeSpanTModel:
@@ -86,19 +69,64 @@ class InfluxDBFluxQueryBuilder(object):
             rv += self._render_simple_filter(key, value)
         return rv
 
-    def _render_aggregator(self, aggregator):
-        rv = f' |> aggregateWindow(every: {int(self.time_span.window_width.total_seconds())}s, fn: {aggregator}, createEmpty: false)\n'
-        return rv
-
-    def _reshape_output(self):
-        pass
-
     def _render_selectors(self, range=None):
         rv = self._render_bucket()
         rv += self._render_range(range=range)
         if self._simple_filters:
             rv += self._render_simple_filters()
         return rv
+
+    def build(self):
+        raise NotImplementedError
+
+    def repacker(self, response):
+        return response
+
+    @property
+    def strategy(self):
+        return self._strategy
+
+    @property
+    def response_columns(self):
+        return []
+
+
+class InfluxDBFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
+    _extra_columns = []
+    _strategy = None
+
+    def __init__(self, params: TimeSeriesQueryItemTModel,
+                 include_open=True, include_close=True,
+                 lone_value=False):
+        super().__init__()
+        if not lone_value:
+            raise NotImplementedError(
+                "These query builders presently assume each record holds a single value, "
+                "and is present in the field 'value'. This is how tendril interest monitors "
+                "currently store data in influxdb. If the data you are querying follows this "
+                "pattern, then set lone_value=True when instantiating this builder. However, "
+                "this is not the regular way data is stored in influxdb. If the data you are "
+                "querying does not do this, then the builders will need to be written to allow "
+                "this.")
+        self._params = params
+        self.bucket = params.domain
+        self.time_span = params.time_span
+        self._subqueries = []
+        self.simple_filter('_measurement', params.measurement)
+
+        if include_open:
+            self._subqueries = [
+                ('openValue', (partial(self._render_selectors, range='before'),
+                               ' |> last()\n')),
+                ('rangeValues', (self._render_selectors,))
+            ]
+
+    def _render_aggregator(self, aggregator):
+        rv = f' |> aggregateWindow(every: {int(self.time_span.window_width.total_seconds())}s, fn: {aggregator}, createEmpty: false)\n'
+        return rv
+
+    def _reshape_output(self):
+        pass
 
     def _render_union(self):
         return f'union(tables: [{", ".join([x[0] for x in self._subqueries])}])\n'
@@ -131,14 +159,6 @@ class InfluxDBFluxQueryBuilder(object):
 
     def repacker(self, response):
         return response.to_values(columns=['_time', self._params.measurement])
-
-    @property
-    def strategy(self):
-        return self._strategy
-
-    @property
-    def response_columns(self):
-        return []
 
 
 class SimpleFluxQueryBuilder(InfluxDBFluxQueryBuilder):
