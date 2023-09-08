@@ -141,3 +141,4 @@ class TimeSeriesQueryItemTModel(TendrilTBaseModel):
     tags: Dict[str, str]
     fields: List[str]
     exporter: TimeSeriesExporter
+    include_ends: bool = True

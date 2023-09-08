@@ -96,7 +96,6 @@ class InfluxDBFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
     _strategy = None
 
     def __init__(self, params: TimeSeriesQueryItemTModel,
-                 include_open=True, include_close=True,
                  lone_value=False):
         super().__init__()
         if not lone_value:
@@ -114,7 +113,7 @@ class InfluxDBFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
         self._subqueries = []
         self.simple_filter('_measurement', params.measurement)
 
-        if include_open:
+        if params.include_ends:
             self._subqueries = [
                 ('openValue', (partial(self._render_selectors, range='before'),
                                ' |> last()\n')),
@@ -250,7 +249,7 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
 
     def add_item(self, params: TimeSeriesQueryItemTModel, lone_value=False):
         if not self._inited:
-            super().__init__(params, include_open=False, lone_value=lone_value)
+            super().__init__(params, lone_value=lone_value)
         if not params.domain == self._params.domain:
             raise ValueError("We require all windowed queries to have the same domain.")
         if not params.time_span == self._time_span:
@@ -265,6 +264,9 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         rv += self._render_simple_filter('_measurement', params.measurement)
         for key, value in params.tags.items():
             rv += self._render_simple_filter(key, value)
+        for field in params.fields:
+            # TODO This breaks for not lone values
+            rv += self._render_simple_filter('_field', field)
         return rv
 
     def _render_channel_aggregator(self, params: TimeSeriesQueryItemTModel):
@@ -297,14 +299,16 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
     def _prepare_channel_integration(self, params):
         rv = f' |> set(key: "name", value:"{params.export_name}")\n'
         # rv += f' |> rename(columns: {{_value: "{params.export_name}"}})\n'
-        rv += f' |> keep(columns: ["_time", "_value", "name"])\n'
+        rv += f' |> keep(columns: ["_time", "_value", "name"])\n\n'
         return rv
 
     def _render_channel(self, params: TimeSeriesQueryItemTModel):
-        rv = f'{params.export_name.replace(".", "_")}_openValue = '
-        rv += self._render_channel_selectors(params, range='before')
-        rv += ' |> last()\n'
-        rv += f' |> toFloat()\n\n'
+        rv = ''
+        if params.include_ends:
+            rv += f'{params.export_name.replace(".", "_")}_openValue = '
+            rv += self._render_channel_selectors(params, range='before')
+            rv += ' |> last()\n'
+            rv += f' |> toFloat()\n\n'
 
         rv += f'{params.export_name.replace(".", "_")}_rangeValues = '
         rv += self._render_channel_selectors(params)
@@ -312,11 +316,15 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         rv += self._render_channel_filler(params)
         rv += f' |> toFloat()\n\n'
 
-        rv += self._reintegrate_channel_data(params)
+        if params.include_ends:
+            rv += self._reintegrate_channel_data(params)
         rv += self._prepare_channel_integration(params)
         # rv += f' |> toFloat()\n\n'
 
-        self._channel_tables.append(params.export_name.replace(".", "_"))
+        if params.include_ends:
+            self._channel_tables.append(params.export_name.replace(".", "_"))
+        else:
+            self._channel_tables.append(params.export_name.replace(".", "_") + "_rangeValues")
         return rv
 
     def _render_channels(self):
@@ -326,7 +334,10 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         return rv
 
     def _render_channels_union(self):
-        rv = f'union(tables: [{", ".join(self._channel_tables)}])\n'
+        if len(self._channel_tables) > 1:
+            rv = f'union(tables: [{", ".join(self._channel_tables)}])\n'
+        else:
+            rv = self._channel_tables[0]
         return rv
 
     def _reshape_output(self):
