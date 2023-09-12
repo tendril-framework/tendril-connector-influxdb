@@ -20,6 +20,13 @@ def _get_bucket(domain):
 _buckets = {x: _get_bucket(x) for x in INFLUXDB_BUCKETS}
 
 
+def _escape(name):
+    return name \
+        .replace(".", "_") \
+        .replace("-", "_") \
+        .replace(" ", "_")
+
+
 class InfluxDBFluxQueryBuilderBase(object):
     _strategy = None
     want_data_frame = False
@@ -289,9 +296,9 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         return rv
 
     def _reintegrate_channel_data(self, params: TimeSeriesQueryItemTModel):
-        open_value = f'{params.export_name.replace(".", "_")}_openValue'
-        range_values = f'{params.export_name.replace(".", "_")}_rangeValues'
-        rv = f'{params.export_name.replace(".", "_")} = '
+        open_value = f'{_escape(params.export_name)}_openValue'
+        range_values = f'{_escape(params.export_name)}_rangeValues'
+        rv = f'{_escape(params.export_name)} = '
         rv += f'union(tables: [{open_value}, {range_values}])\n'
         rv += ' |> group()\n'
         return rv
@@ -305,12 +312,12 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
     def _render_channel(self, params: TimeSeriesQueryItemTModel):
         rv = ''
         if params.include_ends:
-            rv += f'{params.export_name.replace(".", "_")}_openValue = '
+            rv += f'{_escape(params.export_name)}_openValue = '
             rv += self._render_channel_selectors(params, range='before')
             rv += ' |> last()\n'
             rv += f' |> toFloat()\n\n'
 
-        rv += f'{params.export_name.replace(".", "_")}_rangeValues = '
+        rv += f'{_escape(params.export_name)}_rangeValues = '
         rv += self._render_channel_selectors(params)
         rv += self._render_channel_aggregator(params)
         rv += self._render_channel_filler(params)
@@ -322,9 +329,9 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         # rv += f' |> toFloat()\n\n'
 
         if params.include_ends:
-            self._channel_tables.append(params.export_name.replace(".", "_"))
+            self._channel_tables.append(_escape(params.export_name))
         else:
-            self._channel_tables.append(params.export_name.replace(".", "_") + "_rangeValues")
+            self._channel_tables.append(_escape(params.export_name) + "_rangeValues")
         return rv
 
     def _render_channels(self):
