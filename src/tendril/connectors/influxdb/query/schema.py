@@ -7,7 +7,7 @@ class DistinctTagsFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
     _strategy = 'DistinctTagsExtraction'
     want_data_frame = True
 
-    def __init__(self, bucket, measurement, tag,
+    def __init__(self, bucket, measurement, field, tag,
                  filters=None, time_span=None):
         super().__init__()
         self._bucket = bucket
@@ -17,6 +17,8 @@ class DistinctTagsFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
         self.simple_filter('_measurement', measurement)
         for k, v in filters.items():
             self.simple_filter(k, v)
+        if field:
+            self.simple_filter('_field', field)
 
     def _build_unfiltered(self):
         rv = 'import "influxdata/influxdb/schema"\n\n'
