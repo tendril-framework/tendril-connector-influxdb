@@ -7,8 +7,11 @@ from typing import List
 from pydantic import root_validator
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 from tendril.utils.pydantic import TendrilTBaseModel
 from tendril.core.tsdb.constants import TimeSeriesExporter
+from tendril.utils import log
+logger = log.get_logger(__name__, log.DEFAULT)
 
 
 class QueryTimeSpanTModel(TendrilTBaseModel):
@@ -115,14 +118,14 @@ class QueryTimeSpanTModel(TendrilTBaseModel):
 
     @root_validator()
     def span_validation(cls, values):
+        logger.debug(f"Validating {values}")
         over_constrained, under_constrained = cls._check_fixers(values)
-
         if over_constrained:
             raise ValueError("Query Time Span is over-constrained!")
 
         while under_constrained:
             if not values.get('end', None):
-                values['end'] = datetime.now()
+                values['end'] = datetime.now(timezone.utc)
             elif not values.get('width', None):
                 values['width'] = timedelta(days=1)
             over_constrained, under_constrained = cls._check_fixers(values)

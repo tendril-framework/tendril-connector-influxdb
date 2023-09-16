@@ -47,4 +47,6 @@ class DistinctTagsFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
             return self._build_filtered()
 
     def repacker(self, response):
+        if '_value' not in response.keys():
+            return []
         return response['_value'].to_list()
