@@ -11,7 +11,7 @@ from tendril.core.tsdb.query.models import TimeSeriesQueryItemTModel
 from tendril.core.tsdb.query.models import QueryTimeSpanTModel
 from tendril.core.tsdb.constants import TimeSeriesExporter
 from tendril.utils import log
-logger = log.get_logger(__name__, log.DEFAULT)
+logger = log.get_logger(__name__)
 
 
 def _get_bucket(domain):
@@ -127,7 +127,31 @@ class InfluxDBFluxQueryBuilder(InfluxDBFluxQueryBuilderBase):
                 ('rangeValues', (self._render_selectors,))
             ]
 
-    def _render_aggregator(self, aggregator):
+    def _render_aggregator(self, exporter):
+        match exporter:
+            case TimeSeriesExporter.AGGREGATE_MEAN:
+                aggregator = 'mean'
+            case TimeSeriesExporter.AGGREGATE_SUM:
+                aggregator = 'sum'
+            case TimeSeriesExporter.AGGREGATE_COUNT:
+                aggregator = 'count'
+            case _:
+                raise NotImplementedError("We only presently support mean, sum "
+                                          "and count aggregators")
+        rv = f' |> {aggregator}()\n'
+        return rv
+
+    def _render_windowed_aggregator(self, exporter):
+        match exporter:
+            case TimeSeriesExporter.WINDOWED_MEAN:
+                aggregator = 'mean'
+            case TimeSeriesExporter.WINDOWED_SUM:
+                aggregator = 'sum'
+            case TimeSeriesExporter.WINDOWED_COUNT:
+                aggregator = 'count'
+            case _:
+                raise NotImplementedError("We only presently support mean, sum "
+                                          "and count aggregators")
         rv = f' |> aggregateWindow(every: {int(self.time_span.window_width.total_seconds())}s, fn: {aggregator}, createEmpty: false)\n'
         return rv
 
@@ -247,6 +271,41 @@ class DiscontinuitiesOnlyFluxQueryBuilder(SimpleFluxQueryBuilder):
             logger.warn(f"Expected column not found in query response.\n Error: {e} \n Query:\n {self.build()}")
 
 
+class AggregatedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
+    @property
+    def strategy(self):
+        return self._params.exporter
+
+    def __init__(self, params, lone_value=False):
+        super(AggregatedFluxQueryBuilder, self).__init__(params, lone_value=lone_value)
+        for key, value in params.tags.items():
+            self.simple_filter(key, value)
+        for field in params.fields:
+            # TODO This breaks for not lone values
+            self.simple_filter('_field', field)
+
+    def _render_logic(self):
+        return self._render_aggregator(self._params.exporter)
+
+    def _reshape_output(self):
+        # The idea is for _extra_columns to survive in the response. Typically,
+        # this would be used as a dataframe for postprocessing in python/polars.
+        columns = ["_measurement", "_value"] + self._extra_columns
+        columns_str = ", ".join([f'"{x}"' for x in columns])
+        rv = f' |> keep(columns: [{columns_str}])\n'
+        return rv
+
+    @property
+    def response_columns(self):
+        return [self._params.export_name]
+
+    def repacker(self, response):
+        rv = response.to_values(columns=['_value'])
+        if len(rv) > 1:
+            logger.warn(f"Expected only a single record, got {len(rv)}")
+        return rv[0]
+
+
 class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
     def __init__(self, common_tags):
         self._common_tags = common_tags
@@ -277,14 +336,7 @@ class WindowedFluxQueryBuilder(InfluxDBFluxQueryBuilder):
         return rv
 
     def _render_channel_aggregator(self, params: TimeSeriesQueryItemTModel):
-        match params.exporter:
-            case TimeSeriesExporter.WINDOWED_MEAN:
-                aggregator = 'mean'
-            case TimeSeriesExporter.WINDOWED_SUMMATION:
-                aggregator = 'sum'
-            case _:
-                raise NotImplementedError("We only presently support mean and sum aggregators")
-        rv = self._render_aggregator(aggregator)
+        rv = self._render_windowed_aggregator(params.exporter)
         return rv
 
     def _render_channel_filler(self, params: TimeSeriesQueryItemTModel):

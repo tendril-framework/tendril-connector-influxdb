@@ -7,6 +7,7 @@ from .builder import SimpleFluxQueryBuilder
 from .builder import ChangesOnlyFluxQueryBuilder
 from .builder import DiscontinuitiesOnlyFluxQueryBuilder
 from .builder import WindowedFluxQueryBuilder
+from .builder import AggregatedFluxQueryBuilder
 
 
 def intersect_dicts(a, b):
@@ -77,9 +78,18 @@ class InfluxDBQueryPlanner(object):
                     builder = SimpleFluxQueryBuilder(item, lone_value=True)
                     yield item.export_name, builder
 
+            elif exporter in (TimeSeriesExporter.AGGREGATE_MEAN,
+                              TimeSeriesExporter.AGGREGATE_SUM,
+                              TimeSeriesExporter.AGGREGATE_BAND,
+                              TimeSeriesExporter.AGGREGATE_COUNT):
+                for item in items:
+                    builder = AggregatedFluxQueryBuilder(item, lone_value=True)
+                    yield item.export_name, builder
+
             elif exporter in (TimeSeriesExporter.WINDOWED_MEAN,
-                              TimeSeriesExporter.WINDOWED_SUMMATION,
-                              TimeSeriesExporter.WINDOWED_BAND):
+                              TimeSeriesExporter.WINDOWED_SUM,
+                              TimeSeriesExporter.WINDOWED_BAND,
+                              TimeSeriesExporter.WINDOWED_COUNT):
                 for item in items:
                     windowed_items.append(item)
 
